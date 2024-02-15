@@ -1,0 +1,39 @@
+PATH
+  remote: .
+  specs:
+    staged_job (0.1.0)
+      activerecord (~> 6.0)
+
+GEM
+  remote: https://rubygems.org/
+  specs:
+    activemodel (6.1.7.6)
+      activesupport (= 6.1.7.6)
+    activerecord (6.1.7.6)
+      activemodel (= 6.1.7.6)
+      activesupport (= 6.1.7.6)
+    activesupport (6.1.7.6)
+      concurrent-ruby (~> 1.0, >= 1.0.2)
+      i18n (>= 1.6, < 2)
+      minitest (>= 5.1)
+      tzinfo (~> 2.0)
+      zeitwerk (~> 2.3)
+    concurrent-ruby (1.2.3)
+    i18n (1.14.1)
+      concurrent-ruby (~> 1.0)
+    minitest (5.22.2)
+    rake (13.1.0)
+    tzinfo (2.0.6)
+      concurrent-ruby (~> 1.0)
+    zeitwerk (2.6.13)
+
+PLATFORMS
+  arm64-darwin-23
+
+DEPENDENCIES
+  minitest (~> 5.0)
+  rake (~> 13.0)
+  staged_job!
+
+BUNDLED WITH
+   2.4.19
