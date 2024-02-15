@@ -22,7 +22,11 @@ GEM
     i18n (1.14.1)
       concurrent-ruby (~> 1.0)
     minitest (5.22.2)
+    minitest-stub-const (0.6)
+    mocha (2.1.0)
+      ruby2_keywords (>= 0.0.5)
     rake (13.1.0)
+    ruby2_keywords (0.0.5)
     tzinfo (2.0.6)
       concurrent-ruby (~> 1.0)
     zeitwerk (2.6.13)
@@ -31,7 +35,9 @@ PLATFORMS
   arm64-darwin-23
 
 DEPENDENCIES
-  minitest (~> 5.0)
+  minitest (~> 5.22)
+  minitest-stub-const (~> 0.6)
+  mocha (~> 2.1.0)
   rake (~> 13.0)
   staged_job!
 
