@@ -37,6 +37,7 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "minitest", "~> 5.22"
   spec.add_development_dependency "minitest-sugar", "~> 2.1"
   spec.add_development_dependency "minitest-bang", "~> 1.0"
+  spec.add_development_dependency "minitest-reporters", "~> 1.6"
   spec.add_development_dependency "mocha", "~> 2.1.0"
   spec.add_development_dependency "minitest-stub-const", "~> 0.6"
 

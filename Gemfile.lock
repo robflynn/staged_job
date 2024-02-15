@@ -16,6 +16,8 @@ GEM
       i18n (>= 1.6, < 2)
       minitest (>= 5.1)
       tzinfo (~> 2.0)
+    ansi (1.5.0)
+    builder (3.2.4)
     concurrent-ruby (1.2.3)
     globalid (1.2.1)
       activesupport (>= 6.1)
@@ -24,12 +26,18 @@ GEM
     minitest (5.22.2)
     minitest-bang (1.0.4)
       minitest (>= 4.7.5)
+    minitest-reporters (1.6.1)
+      ansi
+      builder
+      minitest (>= 5.0)
+      ruby-progressbar
     minitest-stub-const (0.6)
     minitest-sugar (2.1.2)
       minitest (~> 5.0)
     mocha (2.1.0)
       ruby2_keywords (>= 0.0.5)
     rake (13.1.0)
+    ruby-progressbar (1.13.0)
     ruby2_keywords (0.0.5)
     tzinfo (2.0.6)
       concurrent-ruby (~> 1.0)
@@ -41,6 +49,7 @@ DEPENDENCIES
   bundler
   minitest (~> 5.22)
   minitest-bang (~> 1.0)
+  minitest-reporters (~> 1.6)
   minitest-stub-const (~> 0.6)
   minitest-sugar (~> 2.1)
   mocha (~> 2.1.0)

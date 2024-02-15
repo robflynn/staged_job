@@ -4,10 +4,12 @@ $LOAD_PATH.unshift File.expand_path("../lib", __dir__)
 require "staged_job"
 
 require "minitest/autorun"
+require "minitest/reporters"
 require 'mocha/minitest'
 require 'active_job'
 
 ActiveJob::Base.queue_adapter = :test
+Minitest::Reporters.use! Minitest::Reporters::DefaultReporter.new(color: true)
 
 class TestJob < StagedJob::Job
   stage :first_stage do
