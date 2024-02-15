@@ -27,13 +27,16 @@ Gem::Specification.new do |spec|
         f.start_with?(*%w[bin/ test/ spec/ features/ .git .circleci appveyor Gemfile])
     end
   end
-  spec.bindir = "exe"
-  spec.executables = spec.files.grep(%r{\Aexe/}) { |f| File.basename(f) }
   spec.require_paths = ["lib"]
 
   # Uncomment to register a new dependency of your gem
-  spec.add_dependency "activerecord", "~> 6.0"
+  spec.add_dependency "activejob", ">= 4.2.7", "< 7.1"
+  spec.add_dependency "activesupport", ">= 4.2.7", "< 7.1"
+  spec.add_development_dependency "bundler"
+  spec.add_development_dependency "rake", "~> 10.4"
   spec.add_development_dependency "minitest", "~> 5.22"
+  spec.add_development_dependency "minitest-sugar", "~> 2.1"
+  spec.add_development_dependency "minitest-bang", "~> 1.0"
   spec.add_development_dependency "mocha", "~> 2.1.0"
   spec.add_development_dependency "minitest-stub-const", "~> 0.6"
 
