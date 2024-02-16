@@ -83,16 +83,16 @@ class BaseTest < ActiveJob::TestCase
     assert job.finished?
   end
 
-  # it "provide stage output" do
-  #   assert_respond_to TestJob.any_instance, :output
+  it "provide stage output" do
+    assert_respond_to TestJob.any_instance, :output
 
-  #   job = TestJob.new
-  #   job.perform(stage: :first_stage)
-  #   job.perform(stage: :second_stage)
+    job = TestJob.new
+    job.perform(stage: :first_stage)
+    job.perform(stage: :second_stage)
 
-  #   assert_equal 42, job.output[:first_stage]
-  #   assert_equal 43, job.output[:second_stage]
-  # end
+    assert_equal 42, job.output[:first_stage]
+    assert_equal 43, job.output[:second_stage]
+  end
 
   it "allows for synchronous jobs" do
     class SynchronousJob < StagedJob::Base
