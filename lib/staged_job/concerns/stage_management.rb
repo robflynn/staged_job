@@ -26,7 +26,7 @@ module StagedJob
         class_attribute :before_start_procs, instance_writer: false, default: []
         class_attribute :after_finish_procs, instance_writer: false, default: []
 
-        attr_accessor :current_stage, :params, :status
+        attr_accessor :current_stage, :params, :status, :output
 
         # If we don't duplicate the stages, then the stages will be
         # shared between all subclasses.
@@ -44,6 +44,7 @@ module StagedJob
         def initialize(*args)
           super
           self.status = Status::PENDING
+          self.output ||= {}
         end
 
         def pending?
@@ -192,7 +193,9 @@ module StagedJob
 
         def build_stage_method(method_name, &block)
           define_method(method_name) do |**args|
-            instance_exec(**args, &block)
+            result = instance_exec(**args, &block)
+
+            self.output[current_stage] = result
           end
         end # build_stage_method
       end # class_methods

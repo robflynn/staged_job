@@ -13,18 +13,17 @@ Minitest::Reporters.use! Minitest::Reporters::DefaultReporter.new(color: true)
 
 class TestJob < StagedJob::Job
   stage :first_stage do
-    43 + 43
+    42
   end
 
   stage :second_stage do
+    output[:first_stage] + 1
   end
 
   before_stage :first_stage do
-    100
   end
 
   after_stage :first_stage do
-    "first_stage_done"
   end
 end
 

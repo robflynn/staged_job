@@ -59,6 +59,17 @@ class JobTest < ActiveJob::TestCase
     assert job.finished?
   end
 
+  it "provide stage output" do
+    assert_respond_to TestJob.any_instance, :output
+
+    job = TestJob.new
+    job.perform(stage: :first_stage)
+    job.perform(stage: :second_stage)
+
+    assert_equal 42, job.output[:first_stage]
+    assert_equal 43, job.output[:second_stage]
+  end
+
   context "lifecycle hooks" do
 
     context "before and after" do
@@ -154,7 +165,6 @@ class JobTest < ActiveJob::TestCase
     end
 
     context "error handling" do
-
       class ErrorJob < StagedJob::Job
         stage :first_stage do
           raise "This stage should not complete."
