@@ -173,6 +173,9 @@ class JobTest < ActiveJob::TestCase
         job = ErrorJob.new
         job.expects(:my_error_hook).once
         job.perform
+
+        assert_equal :failed, job.status
+        assert job.failed?
       end
 
       it "raises errors if no on_error is given" do

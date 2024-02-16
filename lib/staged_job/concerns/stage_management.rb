@@ -12,7 +12,7 @@ module StagedJob
         PENDING  = :pending
         RUNNING  = :running
         FINISHED = :finished
-        ERROR    = :error
+        FAILED   = :failed
       end
 
       included do
@@ -58,6 +58,10 @@ module StagedJob
           self.status == Status::RUNNING
         end
 
+        def failed?
+          self.status == Status::FAILED
+        end
+
         def perform(stage: nil, **args)
           if self.class.stages.empty?
             raise StagedJob::NoStagesError, "No stages defined for #{self.class.name}"
@@ -79,12 +83,23 @@ module StagedJob
             perform_stage(stage, **args)
           rescue => e
             self.class.call_procs(self, self.class.on_error_procs, e)
+            self.status = Status::FAILED
 
             # If there's no on_error catcher, re-raise the exception
             if self.class.on_error_procs.empty?
               raise e
             end
           end
+
+          # If hte job has failed, let's just exit early
+          #
+          # TODO: Determine what DelayedJob, et. al do with this
+          # failed job. Do they requeue it themselves?  That's
+          # probably okay, so long as we can re-adjust our status.
+          if failed?
+            return
+          end
+
           self.class.call_stage_procs(self, current_stage, self.class.after_stage_procs)
 
           unless last_stage?
