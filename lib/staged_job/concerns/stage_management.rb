@@ -8,6 +8,13 @@ module StagedJob
     module StageManagement
       extend ActiveSupport::Concern
 
+      module Status
+        PENDING  = :pending
+        RUNNING  = :running
+        FINISHED = :finished
+        ERROR    = :error
+      end
+
       included do
         class_attribute :stages, instance_writer: false, default: []
 
@@ -16,8 +23,10 @@ module StagedJob
         class_attribute :before_stage_procs, instance_writer: false, default: []
         class_attribute :after_stage_procs, instance_writer: false, default: []
         class_attribute :on_error_procs, instance_writer: false, default: []
+        class_attribute :before_start_procs, instance_writer: false, default: []
+        class_attribute :after_finish_procs, instance_writer: false, default: []
 
-        attr_accessor :current_stage, :params
+        attr_accessor :current_stage, :params, :status
 
         # If we don't duplicate the stages, then the stages will be
         # shared between all subclasses.
@@ -28,6 +37,25 @@ module StagedJob
           subclass.before_stage_procs = before_stage_procs.dup
           subclass.after_stage_procs = after_stage_procs.dup
           subclass.on_error_procs = on_error_procs.dup
+          subclass.before_start_procs = before_start_procs.dup
+          subclass.after_finish_procs = after_finish_procs.dup
+        end
+
+        def initialize(*args)
+          super
+          self.status = Status::PENDING
+        end
+
+        def pending?
+          self.status == Status::PENDING
+        end
+
+        def finished?
+          self.status == Status::FINISHED
+        end
+
+        def running?
+          self.status == Status::RUNNING
         end
 
         def perform(stage: nil, **args)
@@ -38,6 +66,12 @@ module StagedJob
           stage ||= stages.first
           self.current_stage = stage
           self.params = args
+
+          if pending?
+            self.class.call_procs(self, self.class.before_start_procs)
+          end
+
+          self.status = Status::RUNNING
 
           self.class.call_stage_procs(self, current_stage, self.class.before_stage_procs)
 
@@ -52,6 +86,13 @@ module StagedJob
             end
           end
           self.class.call_stage_procs(self, current_stage, self.class.after_stage_procs)
+
+          unless last_stage?
+            transition_to(next_stage)
+          else
+            self.status = Status::FINISHED
+            self.class.call_procs(self, self.class.after_finish_procs)
+          end
         end
 
         def perform_stage(stage, **args)
@@ -77,6 +118,10 @@ module StagedJob
         end
       end
 
+      ####################
+      # CLASS METHODS
+      ####################
+
       class_methods do
         def stage(stage_name, &block)
           stages << stage_name
@@ -84,6 +129,14 @@ module StagedJob
           method_name = "perform_stage_#{stage_name}"
 
           build_stage_method(method_name, &block)
+        end
+
+        def before_start(method_name = nil, &block)
+          before_start_procs << { method: method_name, block: block }
+        end
+
+        def after_finish(method_name = nil, &block)
+          after_finish_procs << { method: method_name, block: block }
         end
 
         def before_stage(stage = nil, method_name = nil, &block)
@@ -124,17 +177,10 @@ module StagedJob
 
         def build_stage_method(method_name, &block)
           define_method(method_name) do |**args|
-
             instance_exec(**args, &block)
-
-            unless last_stage?
-              transition_to(next_stage)
-            else
-              # TODO: Handle done condition
-            end
           end
-        end
-      end
-    end
-  end
-end
+        end # build_stage_method
+      end # class_methods
+    end # StageManagement
+  end # Concerns
+end  # StagedJob

@@ -40,6 +40,25 @@ class JobTest < ActiveJob::TestCase
     end
   end
 
+  it "should have a pending status before the first stage" do
+    job = TestJob.new
+    assert job.pending?
+  end
+
+  it "should have a finished state after the last stage" do
+    class FinishJob < StagedJob::Job
+      stage :first_stage do
+      end
+
+      stage :second_stage do
+      end
+    end
+
+    job = FinishJob.new
+    job.perform(stage: :second_stage)
+    assert job.finished?
+  end
+
   context "lifecycle hooks" do
 
     context "before and after" do
@@ -81,6 +100,58 @@ class JobTest < ActiveJob::TestCase
         job.perform
       end
     end # context "before and after"
+
+    context "start and finish" do
+      class StartFinishJob < StagedJob::Job
+        stage :first_stage do
+        end
+
+        stage :second_stage do
+        end
+
+        before_start :my_before_start_hook
+        after_finish :my_after_finish_hook
+
+        before_stage :first_stage, :my_before_stage_hook
+        after_stage :second_stage, :my_after_stage_hook
+
+        def my_before_start_hook;end
+        def my_after_finish_hook;end
+        def my_before_stage_hook;end
+        def my_after_stage_hook;end
+      end
+
+      it "should allow for defining start and finish hooks" do
+        assert_respond_to TestJob, :before_start
+        assert_respond_to TestJob, :after_finish
+      end
+
+      it "should fire before_start and after_finish hooks" do
+        sequence = sequence('hooks')
+
+        job = StartFinishJob.new
+        job.expects(:my_before_start_hook).in_sequence(sequence)
+        job.expects(:perform_stage).with(:first_stage).in_sequence(sequence)
+        job.expects(:perform_stage).with(:second_stage).in_sequence(sequence)
+        job.expects(:my_after_finish_hook).in_sequence(sequence)
+
+        job.perform(stage: :first_stage)
+        job.perform(stage: :second_stage)
+      end
+
+      it "fires before stage after starting, and after stage before finishing" do
+        job = StartFinishJob.new
+
+        sequence = sequence('hooks')
+        job.expects(:my_before_start_hook).in_sequence(sequence)
+        job.expects(:my_before_stage_hook).in_sequence(sequence)
+        job.expects(:my_after_stage_hook).in_sequence(sequence)
+        job.expects(:my_after_finish_hook).in_sequence(sequence)
+
+        job.perform(stage: :first_stage)
+        job.perform(stage: :second_stage)
+      end
+    end
 
     context "error handling" do
 
