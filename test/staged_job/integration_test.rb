@@ -1,112 +1,16 @@
 require "test_helper"
 
-class JobTest < ActiveJob::TestCase
-  def setup
+class IntegrationTest < ActiveJob::TestCase
+  setup do
     ActiveJob::Base.queue_adapter = :test
     ActiveJob::Base.logger.level = Logger::UNKNOWN # Silences the logger
   end
 
-  def teardown
-    ActiveJob::Base.logger.level = Logger::DEBUG # Resets logger level or to whatever default you prefer
+  teardown do
+    ActiveJob::Base.logger.level = Logger::DEBUG # Resets logger level
   end
 
-  it "It allows for defining stages" do
-    assert_respond_to TestJob, :stage
-    assert_respond_to TestJob, :stages
-
-    assert_equal [:first_stage, :second_stage], TestJob.stages
-  end
-
-  it "responds to defined stages" do
-    test_job_instance = TestJob.new
-    assert_respond_to test_job_instance, :perform_stage_first_stage
-    assert_respond_to test_job_instance, :perform_stage_second_stage
-  end
-
-  it "it requires stages to exist before running" do
-    assert_raises(StagedJob::NoStagesError) do
-      EmptyJob.perform_now
-    end
-  end
-
-  it "runs the first stage when calling perform" do
-    TestJob.any_instance.expects(:perform_stage_first_stage).once
-    TestJob.perform_now
-  end
-
-  it "should queue the second stage after running the first stage" do
-    assert_enqueued_with(job: TestJob, args: [{ stage: :second_stage }]) do
-      TestJob.perform_now
-    end
-  end
-
-  it "should have a pending status before the first stage" do
-    job = TestJob.new
-    assert job.pending?
-  end
-
-  it "should have a finished state after the last stage" do
-    class FinishJob < StagedJob::Job
-      stage :first_stage do
-      end
-
-      stage :second_stage do
-      end
-    end
-
-    job = FinishJob.new
-    job.perform(stage: :second_stage)
-    assert job.finished?
-  end
-
-  it "provide stage output" do
-    assert_respond_to TestJob.any_instance, :output
-
-    job = TestJob.new
-    job.perform(stage: :first_stage)
-    job.perform(stage: :second_stage)
-
-    assert_equal 42, job.output[:first_stage]
-    assert_equal 43, job.output[:second_stage]
-  end
-
-  it "allows for synchronous jobs" do
-    class SynchronousJob < StagedJob::Job
-      async false
-
-      stage :first_stage do
-        42
-      end
-
-      stage :second_stage do
-        output[:first_stage] + 1
-      end
-
-      stage :third_stage do
-        output[:second_stage] * 2
-      end
-
-      after_finish :my_after_finish_hook
-
-      def my_after_finish_hook
-        output[:third_stage] + 1
-      end
-    end
-
-    job = SynchronousJob.new
-    job.perform_now
-
-    result = job.my_after_finish_hook
-
-    assert job.finished?
-    assert_equal 42, job.output[:first_stage]
-    assert_equal 43, job.output[:second_stage]
-    assert_equal 86, job.output[:third_stage]
-    assert_equal 87, result
-  end
-
-  context "lifecycle hooks" do
-
+  context "Lifecycle Hook Integration" do
     context "before and after" do
       it "allows for specifying before and after hooks for stages" do
         class FooJob < StagedJob::Job
@@ -121,8 +25,9 @@ class JobTest < ActiveJob::TestCase
         assert_respond_to FooJob, :before_stage
         assert_respond_to FooJob, :after_stage
 
-        assert_equal 1, FooJob.before_stage_procs.size
-        assert_equal 2, FooJob.after_stage_procs.size
+        job = FooJob.new
+        assert_equal 1, job.lifecycle_manager.callbacks[:before_stage].size
+        assert_equal 2, job.lifecycle_manager.callbacks[:after_stage].size
       end
 
       it "fires before and after lifecycle events around the stage" do
@@ -145,7 +50,8 @@ class JobTest < ActiveJob::TestCase
 
         job.perform
       end
-    end # context "before and after"
+    end # end context "before and after hooks"
+
 
     context "start and finish" do
       class StartFinishJob < StagedJob::Job
@@ -185,7 +91,7 @@ class JobTest < ActiveJob::TestCase
         job.perform(stage: :second_stage)
       end
 
-      it "fires before stage after starting, and after stage before finishing" do
+      it "fires before stage after starting and after stage before finishing" do
         job = StartFinishJob.new
 
         sequence = sequence('hooks')
@@ -198,7 +104,9 @@ class JobTest < ActiveJob::TestCase
         job.perform(stage: :second_stage)
       end
     end
+  end # end context "Lifecycle Hook Integration"
 
+  context "Error Handling" do
     context "error handling" do
       class ErrorJob < StagedJob::Job
         stage :first_stage do
@@ -211,7 +119,7 @@ class JobTest < ActiveJob::TestCase
 
       it "allows for defining error hooks" do
         assert_respond_to ErrorJob, :on_error
-        assert_equal 1, ErrorJob.on_error_procs.size
+        assert_equal 1, ErrorJob.lifecycle_manager.callbacks[:on_error].size
       end
 
       it "it fires on_error hooks when a stage fails" do
@@ -229,5 +137,5 @@ class JobTest < ActiveJob::TestCase
         end
       end
     end # context "error handling"
-  end # context "lifecycle hooks"
+  end
 end

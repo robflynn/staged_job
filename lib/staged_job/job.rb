@@ -1,5 +1,4 @@
 module StagedJob
-  class Job < ActiveJob::Base
-    include StagedJob::Concerns::StageManagement
+  class Job < StagedJob::Base
   end
 end
