@@ -70,6 +70,41 @@ class JobTest < ActiveJob::TestCase
     assert_equal 43, job.output[:second_stage]
   end
 
+  it "allows for synchronous jobs" do
+    class SynchronousJob < StagedJob::Job
+      async false
+
+      stage :first_stage do
+        42
+      end
+
+      stage :second_stage do
+        output[:first_stage] + 1
+      end
+
+      stage :third_stage do
+        output[:second_stage] * 2
+      end
+
+      after_finish :my_after_finish_hook
+
+      def my_after_finish_hook
+        output[:third_stage] + 1
+      end
+    end
+
+    job = SynchronousJob.new
+    job.perform_now
+
+    result = job.my_after_finish_hook
+
+    assert job.finished?
+    assert_equal 42, job.output[:first_stage]
+    assert_equal 43, job.output[:second_stage]
+    assert_equal 86, job.output[:third_stage]
+    assert_equal 87, result
+  end
+
   context "lifecycle hooks" do
 
     context "before and after" do

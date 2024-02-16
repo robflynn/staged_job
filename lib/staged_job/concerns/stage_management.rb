@@ -16,6 +16,7 @@ module StagedJob
       end
 
       included do
+        class_attribute :asynchronous, instance_writer: false, default: true
         class_attribute :stages, instance_writer: false, default: []
 
         # Note: We're keeping before_stage_procs an array because
@@ -34,6 +35,8 @@ module StagedJob
           super
 
           subclass.stages = stages.dup
+          subclass.asynchronous = asynchronous
+
           subclass.before_stage_procs = before_stage_procs.dup
           subclass.after_stage_procs = after_stage_procs.dup
           subclass.on_error_procs = on_error_procs.dup
@@ -130,7 +133,11 @@ module StagedJob
         private
 
         def requeue_or_run(stage)
-          self.class.set(wait: 1.seconds).perform_later(stage: stage, **params)
+          if self.class.asynchronous
+            self.class.set(wait: 1.seconds).perform_later(stage: stage, **params)
+          else
+            perform(stage: stage, **params)
+          end
         end
       end
 
@@ -139,6 +146,10 @@ module StagedJob
       ####################
 
       class_methods do
+        def async(asynchronous = true)
+          self.asynchronous = asynchronous
+        end
+
         def stage(stage_name, &block)
           stages << stage_name
 
