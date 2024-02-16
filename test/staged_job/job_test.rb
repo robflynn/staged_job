@@ -42,42 +42,73 @@ class JobTest < ActiveJob::TestCase
 
   context "lifecycle hooks" do
 
-    it "allows for specifying before and after hooks for stages" do
-      class FooJob < StagedJob::Job
-        stage :first do
+    context "before and after" do
+      it "allows for specifying before and after hooks for stages" do
+        class FooJob < StagedJob::Job
+          stage :first do
+          end
+
+          before_stage :first
+          after_stage :first
+          after_stage :first
         end
 
-        before_stage :first
-        after_stage :first
-        after_stage :first
+        assert_respond_to FooJob, :before_stage
+        assert_respond_to FooJob, :after_stage
+
+        assert_equal 1, FooJob.before_stage_procs.size
+        assert_equal 2, FooJob.after_stage_procs.size
       end
 
-      assert_respond_to FooJob, :before_stage
-      assert_respond_to FooJob, :after_stage
+      it "fires before and after lifecycle events around the stage" do
+        class HookJob < StagedJob::Job
+          stage :first_stage
 
-      assert_equal 1, FooJob.before_stage_procs.size
-      assert_equal 2, FooJob.after_stage_procs.size
-    end
+          before_stage :first_stage, :my_before_hook
+          after_stage :first_stage, :my_after_hook
 
-    it "fires before and after lifecycle events around the stage" do
-      class HookJob < StagedJob::Job
-        stage :first_stage
+          def my_before_hook; end
+          def my_after_hook; end
+        end
 
-        before_stage :first_stage, :my_before_hook
-        after_stage :first_stage, :my_after_hook
+        sequence = sequence('hooks')
 
-        def my_before_hook; end
-        def my_after_hook; end
+        job = HookJob.new
+        job.expects(:my_before_hook).in_sequence(sequence)
+        job.expects(:perform_stage).in_sequence(sequence)
+        job.expects(:my_after_hook).in_sequence(sequence)
+
+        job.perform
+      end
+    end # context "before and after"
+
+    context "error handling" do
+
+      class ErrorJob < StagedJob::Job
+        stage :first_stage do
+          raise "This stage should not complete."
+        end
+
+        on_error :my_error_hook
+        def my_error_hook(e); end
       end
 
-      sequence = sequence('hooks')
+      it "allows for defining error hooks" do
+        assert_respond_to ErrorJob, :on_error
+        assert_equal 1, ErrorJob.on_error_procs.size
+      end
 
-      job = HookJob.new
-      job.expects(:my_before_hook).in_sequence(sequence)
-      job.expects(:perform_stage).in_sequence(sequence)
-      job.expects(:my_after_hook).in_sequence(sequence)
+      it "it fires on_error hooks when a stage fails" do
+        job = ErrorJob.new
+        job.expects(:my_error_hook).once
+        job.perform
+      end
 
-      job.perform
-    end
+      it "raises errors if no on_error is given" do
+        assert_raises StandardError do
+          FailingJob.perform_now
+        end
+      end
+    end # context "error handling"
   end # context "lifecycle hooks"
 end

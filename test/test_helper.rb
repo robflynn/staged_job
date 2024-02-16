@@ -30,15 +30,14 @@ end
 
 class FailingJob < StagedJob::Job
   stage :first_stage do
-    return true
+      raise "This stage should not complete."
   end
 
   stage :second_stage do
-    raise "This stage should not complete."
   end
 
   stage :third_stage do
-    return 43
+    43
   end
 end
 

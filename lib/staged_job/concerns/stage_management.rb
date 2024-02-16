@@ -15,6 +15,7 @@ module StagedJob
         # we want hooks to be executed in the order they were defined.
         class_attribute :before_stage_procs, instance_writer: false, default: []
         class_attribute :after_stage_procs, instance_writer: false, default: []
+        class_attribute :on_error_procs, instance_writer: false, default: []
 
         attr_accessor :current_stage, :params
 
@@ -26,6 +27,7 @@ module StagedJob
           subclass.stages = stages.dup
           subclass.before_stage_procs = before_stage_procs.dup
           subclass.after_stage_procs = after_stage_procs.dup
+          subclass.on_error_procs = on_error_procs.dup
         end
 
         def perform(stage: nil, **args)
@@ -38,7 +40,17 @@ module StagedJob
           self.params = args
 
           self.class.call_stage_procs(self, current_stage, self.class.before_stage_procs)
-          perform_stage(stage, **args)
+
+          begin
+            perform_stage(stage, **args)
+          rescue => e
+            self.class.call_procs(self, self.class.on_error_procs, e)
+
+            # If there's no on_error catcher, re-raise the exception
+            if self.class.on_error_procs.empty?
+              raise e
+            end
+          end
           self.class.call_stage_procs(self, current_stage, self.class.after_stage_procs)
         end
 
@@ -82,6 +94,10 @@ module StagedJob
           after_stage_procs << { stage: stage, method: method_name, block: block }
         end
 
+        def on_error(method_name = nil, &block)
+          on_error_procs << { method: method_name, block: block }
+        end
+
         def call_stage_procs(job, stage, procs)
           procs.each do |hook|
             next unless hook[:stage].nil? || hook[:stage] == stage
@@ -90,6 +106,16 @@ module StagedJob
               job.send(hook[:method])
             else
               hook[:block].call(stage)
+            end
+          end
+        end
+
+        def call_procs(job, procs, *args)
+          procs.each do |hook|
+            if hook[:method]
+              job.send(hook[:method], *args)
+            else
+              hook[:block].call(*args)
             end
           end
         end
