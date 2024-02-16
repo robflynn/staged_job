@@ -18,6 +18,14 @@ class TestJob < StagedJob::Job
 
   stage :second_stage do
   end
+
+  before_stage :first_stage do
+    100
+  end
+
+  after_stage :first_stage do
+    "first_stage_done"
+  end
 end
 
 class FailingJob < StagedJob::Job
@@ -47,6 +55,10 @@ class ActiveSupport::TestCase
   class << self
     def it(description, &block)
       test(description, &block)
+    end
+
+    def context(description, &block)
+      block.call
     end
   end
 end

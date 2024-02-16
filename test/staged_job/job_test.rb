@@ -4,8 +4,6 @@ class JobTest < ActiveJob::TestCase
   def setup
     ActiveJob::Base.queue_adapter = :test
     ActiveJob::Base.logger.level = Logger::UNKNOWN # Silences the logger
-
-    @test_job_instance = TestJob.new
   end
 
   def teardown
@@ -20,8 +18,9 @@ class JobTest < ActiveJob::TestCase
   end
 
   it "responds to defined stages" do
-    assert_respond_to @test_job_instance, :perform_stage_first_stage
-    assert_respond_to @test_job_instance, :perform_stage_second_stage
+    test_job_instance = TestJob.new
+    assert_respond_to test_job_instance, :perform_stage_first_stage
+    assert_respond_to test_job_instance, :perform_stage_second_stage
   end
 
   it "it requires stages to exist before running" do
@@ -40,4 +39,45 @@ class JobTest < ActiveJob::TestCase
       TestJob.perform_now
     end
   end
+
+  context "lifecycle hooks" do
+
+    it "allows for specifying before and after hooks for stages" do
+      class FooJob < StagedJob::Job
+        stage :first do
+        end
+
+        before_stage :first
+        after_stage :first
+        after_stage :first
+      end
+
+      assert_respond_to FooJob, :before_stage
+      assert_respond_to FooJob, :after_stage
+
+      assert_equal 1, FooJob.before_stage_procs.size
+      assert_equal 2, FooJob.after_stage_procs.size
+    end
+
+    it "fires before and after lifecycle events around the stage" do
+      class HookJob < StagedJob::Job
+        stage :first_stage
+
+        before_stage :first_stage, :my_before_hook
+        after_stage :first_stage, :my_after_hook
+
+        def my_before_hook; end
+        def my_after_hook; end
+      end
+
+      sequence = sequence('hooks')
+
+      job = HookJob.new
+      job.expects(:my_before_hook).in_sequence(sequence)
+      job.expects(:perform_stage).in_sequence(sequence)
+      job.expects(:my_after_hook).in_sequence(sequence)
+
+      job.perform
+    end
+  end # context "lifecycle hooks"
 end

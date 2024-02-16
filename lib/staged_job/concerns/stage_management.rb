@@ -11,6 +11,11 @@ module StagedJob
       included do
         class_attribute :stages, instance_writer: false, default: []
 
+        # Note: We're keeping before_stage_procs an array because
+        # we want hooks to be executed in the order they were defined.
+        class_attribute :before_stage_procs, instance_writer: false, default: []
+        class_attribute :after_stage_procs, instance_writer: false, default: []
+
         attr_accessor :current_stage, :params
 
         # If we don't duplicate the stages, then the stages will be
@@ -19,6 +24,8 @@ module StagedJob
           super
 
           subclass.stages = stages.dup
+          subclass.before_stage_procs = before_stage_procs.dup
+          subclass.after_stage_procs = after_stage_procs.dup
         end
 
         def perform(stage: nil, **args)
@@ -30,6 +37,12 @@ module StagedJob
           self.current_stage = stage
           self.params = args
 
+          self.class.call_stage_procs(self, current_stage, self.class.before_stage_procs)
+          perform_stage(stage, **args)
+          self.class.call_stage_procs(self, current_stage, self.class.after_stage_procs)
+        end
+
+        def perform_stage(stage, **args)
           send("perform_stage_#{stage}", **args)
         end
 
@@ -61,13 +74,32 @@ module StagedJob
           build_stage_method(method_name, &block)
         end
 
+        def before_stage(stage = nil, method_name = nil, &block)
+          before_stage_procs << { stage: stage, method: method_name, block: block }
+        end
+
+        def after_stage(stage = nil, method_name = nil,  &block)
+          after_stage_procs << { stage: stage, method: method_name, block: block }
+        end
+
+        def call_stage_procs(job, stage, procs)
+          procs.each do |hook|
+            next unless hook[:stage].nil? || hook[:stage] == stage
+
+            if hook[:method]
+              job.send(hook[:method])
+            else
+              hook[:block].call(stage)
+            end
+          end
+        end
+
         private
 
         def build_stage_method(method_name, &block)
           define_method(method_name) do |**args|
-            # TODO: Fire before_stage
+
             instance_exec(**args, &block)
-            # TODO: Fire after_stage
 
             unless last_stage?
               transition_to(next_stage)
