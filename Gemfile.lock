@@ -2,8 +2,8 @@ PATH
   remote: .
   specs:
     staged_job (0.1.0)
-      activejob (>= 4.2.7, < 7.1)
-      activesupport (>= 4.2.7, < 7.1)
+      activejob (>= 4.2.7, <= 7.1)
+      activesupport (>= 4.2.7, <= 7.1)
 
 GEM
   remote: https://rubygems.org/

@@ -10,6 +10,14 @@ class IntegrationTest < ActiveJob::TestCase
     ActiveJob::Base.logger.level = Logger::DEBUG # Resets logger level
   end
 
+  context "Output and Parameters" do
+    it "allows for using parameters in hooks" do
+      job = ParameterJob.new
+      job.perform(number: 2, exponent: 5)
+      assert_equal "20", job.output[:hexify]
+    end
+  end
+
   context "Lifecycle Hook Integration" do
     context "before and after" do
       it "allows for specifying before and after hooks for stages" do

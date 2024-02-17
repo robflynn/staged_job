@@ -7,6 +7,7 @@ module StagedJob
     class_attribute :stages, instance_writer: false, default: []
     class_attribute :asynchronous, instance_writer: false, default: true
     class_attribute :lifecycle_manager, instance_writer: false
+    class_attribute :parameters, instance_writer: false, default: []
 
     attr_accessor :current_stage, :status, :output, :params
 
@@ -16,9 +17,10 @@ module StagedJob
       subclass.stages = stages.dup
       subclass.asynchronous = asynchronous.dup
       subclass.lifecycle_manager = Lifecycle.new
+      subclass.parameters = parameters.dup
     end
 
-    def initialize(*args)
+    def initialize(*args, **kwargs)
       super
 
       self.status = Status::PENDING
@@ -28,6 +30,10 @@ module StagedJob
     def self.stage(name, &block)
       stages << name
       build_stage_method("perform_stage_#{name}", &block)
+    end
+
+    def self.params(*args)
+      self.parameters = args
     end
 
     def self.before_stage(stage = nil, method_name = nil, &block)
@@ -58,15 +64,17 @@ module StagedJob
       lifecycle_manager.call_callbacks(event, { stage: job.current_stage, job: job }, *args)
     end
 
-    def perform(stage: nil, **args)
+    def perform(*args, stage: nil, **kwargs)
       if self.class.stages.empty?
         raise StagedJob::NoStagesError, "No stages defined for #{self.class.name}"
       end
 
+      validate_params!(kwargs)
+
       stage ||= stages.first
 
       # Capture the params to pass along to the stages
-      self.params = args
+      self.params = kwargs
       self.current_stage = stage
 
       if pending?
@@ -78,7 +86,7 @@ module StagedJob
       self.class.call_stage_procs(:before_stage, self, self.current_stage)
 
       begin
-        perform_stage(stage, **args)
+        perform_stage(stage, **kwargs)
       rescue => error
         # TODO: Call the NEW lifecycle stuff
         self.status = Status::FAILED
@@ -148,6 +156,14 @@ module StagedJob
     end
 
   private
+
+    def validate_params!(args)
+      missing_args = parameters - args.keys
+
+      if missing_args.any?
+        raise ArgumentError, "Missing arguments: #{missing_args.join(', ')}"
+      end
+    end
 
     def self.build_stage_method(method_name, &block)
       define_method(method_name) do |**args|

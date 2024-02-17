@@ -1,29 +1,5 @@
 require "test_helper"
 
-class NewTestJob < StagedJob::Base
-  stage :first_stage do
-  end
-
-  stage :second_stage do
-  end
-end
-
-class NewEmptyJob < StagedJob::Base
-end
-
-class NewFailingJob < StagedJob::Base
-  stage :first_stage do
-    raise "This stage should not complete."
-  end
-
-  stage :second_stage do
-  end
-
-  stage :third_stage do
-    43
-  end
-end
-
 class BaseTest < ActiveJob::TestCase
   def setup
     ActiveJob::Base.queue_adapter = :test
@@ -34,56 +10,84 @@ class BaseTest < ActiveJob::TestCase
     ActiveJob::Base.logger.level = Logger::DEBUG # Resets logger level or to whatever default you prefer
   end
 
-  it "It allows for defining stages" do
-    assert_respond_to NewTestJob, :stage
-    assert_respond_to NewTestJob, :stages
+  context "#stages" do
+    it "It allows for defining stages" do
+      assert_respond_to TestJob, :stage
+      assert_respond_to TestJob, :stages
 
-    assert_equal [:first_stage, :second_stage], NewTestJob.stages
-  end
-
-  it "responds to defined stages" do
-    test_job_instance = NewTestJob.new
-    assert_respond_to test_job_instance, :perform_stage_first_stage
-    assert_respond_to test_job_instance, :perform_stage_second_stage
-  end
-
-  it "it requires stages to exist before running" do
-    assert_raises(StagedJob::NoStagesError) do
-      NewEmptyJob.perform_now
+      assert_equal [:first_stage, :second_stage], TestJob.stages
     end
-  end
 
-  it "runs the first stage when calling perform" do
-    NewTestJob.any_instance.expects(:perform_stage_first_stage).once
-    NewTestJob.perform_now
-  end
-
-  it "should queue the second stage after running the first stage" do
-    assert_enqueued_with(job: NewTestJob, args: [{ stage: :second_stage }]) do
-      NewTestJob.perform_now
+    it "responds to defined stages" do
+      test_job_instance = TestJob.new
+      assert_respond_to test_job_instance, :perform_stage_first_stage
+      assert_respond_to test_job_instance, :perform_stage_second_stage
     end
-  end
 
-  it "should have a pending status before the first stage" do
-    job = TestJob.new
-    assert job.pending?
-  end
-
-  it "should have a finished state after the last stage" do
-    class FinishJob < StagedJob::Base
-      stage :first_stage do
-      end
-
-      stage :second_stage do
+    it "it requires stages to exist before running" do
+      assert_raises(StagedJob::NoStagesError) do
+        EmptyJob.perform_now
       end
     end
 
-    job = FinishJob.new
-    job.perform(stage: :second_stage)
-    assert job.finished?
-  end
+    it "runs the first stage when calling perform" do
+      TestJob.any_instance.expects(:perform_stage_first_stage).once
+      TestJob.perform_now
+    end
 
-  it "provide stage output" do
+    it "should queue the second stage after running the first stage" do
+      assert_enqueued_with(job: TestJob, args: [{ stage: :second_stage }]) do
+        TestJob.perform_now
+      end
+    end
+  end # end context "#stages"
+
+  context "#params" do
+    it "allows for defining params" do
+      assert_respond_to ParameterJob, :params
+      assert_respond_to ParameterJob.any_instance, :params
+      assert_equal [:number, :exponent], ParameterJob.parameters
+    end
+
+    it "accepts valid params" do
+      assert_nothing_raised do
+        ParameterJob.perform_now(number: 2, exponent: 3)
+      end
+    end
+
+    it "raises an error when invalid params are passed" do
+      assert_raises(ArgumentError) do
+        ParameterJob.perform_now(fish: 12)
+      end
+    end
+
+    it "raises an error when required params are not passed" do
+      assert_raises(ArgumentError) do
+        ParameterJob.perform_now(exponent: 3)
+      end
+    end
+
+    it "passes params to stages when requeing" do
+      assert_enqueued_with(job: AsyncParameterJob, args: [{ stage: :hexify, number: 2, exponent: 3 }]) do
+        AsyncParameterJob.perform_now(number: 2, exponent: 3)
+      end
+    end
+  end # end context "#params"
+
+  context "#status" do
+    it "should have a pending status before the first stage" do
+      job = TestJob.new
+      assert job.pending?
+    end
+
+    it "should have a finished state after the last stage" do
+      job = FinishJob.new
+      job.perform(stage: :second_stage)
+      assert job.finished?
+    end
+  end # end context "#status"
+
+  it "provides stage output" do
     assert_respond_to TestJob.any_instance, :output
 
     job = TestJob.new
@@ -95,22 +99,6 @@ class BaseTest < ActiveJob::TestCase
   end
 
   it "allows for synchronous jobs" do
-    class SynchronousJob < StagedJob::Base
-      async false
-
-      stage :first_stage do
-        42
-      end
-
-      stage :second_stage do
-        output[:first_stage] + 1
-      end
-
-      stage :third_stage do
-        output[:second_stage] * 2
-      end
-    end
-
     job = SynchronousJob.new
     job.perform_now
 
