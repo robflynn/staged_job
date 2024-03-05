@@ -127,9 +127,9 @@ module StagedJob
       requeue_or_run(stage)
     end
 
-    def requeue_or_run(stage)
+    def requeue_or_run(stage, wait: 1.seconds)
       if self.class.asynchronous
-        self.class.set(wait: 1.seconds).perform_later(stage: stage, _output: self.output, **params)
+        self.class.set(wait: wait).perform_later(stage: stage, _output: self.output, **params)
       else
         perform(stage: stage, **params)
       end
