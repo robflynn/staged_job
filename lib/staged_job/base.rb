@@ -61,7 +61,7 @@ module StagedJob
     end
 
     def self.call_stage_procs(event, job, *args)
-      lifecycle_manager.call_callbacks(event, { stage: job.current_stage, job: job }, *args)
+      lifecycle_manager.call_callbacks(event, { stage: job.current_stage, job: job }, *[job, *args])
     end
 
     def perform(*args, stage: nil, _output: nil,  **kwargs)
