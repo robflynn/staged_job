@@ -64,7 +64,7 @@ module StagedJob
       lifecycle_manager.call_callbacks(event, { stage: job.current_stage, job: job }, *args)
     end
 
-    def perform(*args, stage: nil, **kwargs)
+    def perform(*args, stage: nil, _output: nil,  **kwargs)
       if self.class.stages.empty?
         raise StagedJob::NoStagesError, "No stages defined for #{self.class.name}"
       end
@@ -72,6 +72,10 @@ module StagedJob
       validate_params!(kwargs)
 
       stage ||= stages.first
+
+      if _output != nil
+        self.output = _output
+      end
 
       # Capture the params to pass along to the stages
       self.params = kwargs
@@ -125,7 +129,7 @@ module StagedJob
 
     def requeue_or_run(stage)
       if self.class.asynchronous
-        self.class.set(wait: 1.seconds).perform_later(stage: stage, **params)
+        self.class.set(wait: 1.seconds).perform_later(stage: stage, _output: self.output, **params)
       else
         perform(stage: stage, **params)
       end

@@ -36,7 +36,7 @@ class BaseTest < ActiveJob::TestCase
     end
 
     it "should queue the second stage after running the first stage" do
-      assert_enqueued_with(job: TestJob, args: [{ stage: :second_stage }]) do
+      assert_enqueued_with_partial_args(job: TestJob, args: [{ stage: :second_stage }]) do
         TestJob.perform_now
       end
     end
@@ -68,7 +68,7 @@ class BaseTest < ActiveJob::TestCase
     end
 
     it "passes params to stages when requeing" do
-      assert_enqueued_with(job: AsyncParameterJob, args: [{ stage: :hexify, number: 2, exponent: 3 }]) do
+      assert_enqueued_with_partial_args(job: AsyncParameterJob, args: [{ stage: :hexify, number: 2, exponent: 3 }]) do
         AsyncParameterJob.perform_now(number: 2, exponent: 3)
       end
     end
@@ -96,6 +96,12 @@ class BaseTest < ActiveJob::TestCase
 
     assert_equal 42, job.output[:first_stage]
     assert_equal 43, job.output[:second_stage]
+  end
+
+  it "allows accessing a previous jobs output in an asynchronous job" do
+    assert_enqueued_with(job: TestJob, args: [{ stage: :second_stage, _output: { first_stage: 42 } }]) do
+      TestJob.perform_now
+    end
   end
 
   it "allows for synchronous jobs" do

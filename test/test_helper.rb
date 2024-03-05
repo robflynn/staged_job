@@ -9,6 +9,7 @@ require 'mocha/minitest'
 require 'active_job'
 
 ActiveJob::Base.queue_adapter = :test
+
 Minitest::Reporters.use! Minitest::Reporters::DefaultReporter.new(color: true)
 
 class ParameterJob < StagedJob::Job
@@ -96,6 +97,19 @@ module StagedJobHelpers
   include ActiveJob::TestHelper
 end
 
+def deep_symbolize_keys(obj)
+  case obj
+  when Hash
+    obj.each_with_object({}) do |(key, value), result|
+      result[key.to_sym] = deep_symbolize_keys(value)
+    end
+  when Array
+    obj.map { |e| deep_symbolize_keys(e) }
+  else
+    obj
+  end
+end
+
 class ActiveSupport::TestCase
   include StagedJobHelpers
 
@@ -107,5 +121,19 @@ class ActiveSupport::TestCase
     def context(description, &block)
       block.call
     end
+  end
+
+  def assert_enqueued_with_partial_args(job:, args:, &block)
+    assert_enqueued_with(job: job, &block)
+
+    enqueued_job = ActiveJob::Base.queue_adapter.enqueued_jobs.find { |j| j["job_class"] == job.to_s }
+    assert_not_nil enqueued_job, "Expected #{job} to be enqueued"
+
+    enqueued_args = ActiveJob::Arguments.deserialize(enqueued_job["arguments"]).first
+    expected_args = deep_symbolize_keys(args).first
+
+    actual_args = enqueued_args.slice(*expected_args.keys)
+
+    assert_equal expected_args, actual_args, "Expected arguments #{expected_args} do not match actual arguments #{actual_args}"
   end
 end
